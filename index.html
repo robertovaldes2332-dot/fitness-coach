@@ -177,6 +177,13 @@
       <div class="chips" id="goalChips"></div>
     </div>
     <div class="card">
+      <h2>🌐 Idioma / Language</h2>
+      <div class="chips">
+        <button class="chip" id="langEs" onclick="setLang('es')">🇪🇸 Español</button>
+        <button class="chip" id="langEn" onclick="setLang('en')">🇺🇸 English</button>
+      </div>
+    </div>
+    <div class="card">
       <h2>🏋️ Mi equipo del gym</h2>
       <div class="note">Marca lo que SÍ hay en tu gym. El coach solo sugerirá ejercicios que puedas hacer.</div>
       <label style="margin-top:10px">Cardio</label><div class="chips" id="eqCardio"></div>
@@ -573,6 +580,7 @@ function migrate(s){
   if(!s.favorites) s.favorites = [];
   if(!s.avoid) s.avoid = [];
   if(!s.weights) s.weights = {};
+  if(!s.lang) s.lang = 'es';
   return s;
 }
 function defaultEquip(){
@@ -587,6 +595,7 @@ function seed(){
     custom:{},  // {routineName:[{n,s,r,cat,eq}]}
     favorites:[], avoid:[],
     weights:{}, // {exerciseName:[{d:'YYYY-MM-DD', sets:[lb,...]}]}
+    lang:'es',
     week:{1:'Pecho/Tríceps',2:'Espalda/Bíceps',3:'Cardio quema-grasa',
           4:'Piernas',5:'Hombros',6:'Peso corporal (casa)',0:'Descanso'},
     logs:{}, history:[],
@@ -683,8 +692,9 @@ function renderToday(){
   const log = getTodayLog();
   const d = new Date();
   const c = document.getElementById('todayCard');
+  const loc = S.lang==='en' ? 'en-US' : 'es';
   document.getElementById('headerSub').textContent =
-    DAYS_FULL[d.getDay()] + ' · ' + d.toLocaleDateString('es',{day:'numeric',month:'long'});
+    d.toLocaleDateString(loc,{weekday:'long'}) + ' · ' + d.toLocaleDateString(loc,{day:'numeric',month:'long'});
 
   if(log.routine==='Descanso'){
     c.innerHTML = `<div class="empty">😴 Hoy toca <b>Descanso</b>.<br>
@@ -1042,13 +1052,15 @@ function renderWeek(){
   const today=new Date().getDay();
   const order=[1,2,3,4,5,6,0];
   document.getElementById('weekList').innerHTML = order.map(d=>{
-    const opts=ROUTINE_OPTIONS.map(o=>`<option ${S.week[d]===o?'selected':''}>${o}</option>`).join('');
+    const opts=ROUTINE_OPTIONS.map(o=>`<option value="${o}" ${S.week[d]===o?'selected':''}>${o}</option>`).join('');
     return `<div class="day ${d===today?'today':''}" style="border-left:4px solid ${rcolor(S.week[d])}">
       <div class="dn">${DAYS[d]}${d===today?' •':''}</div>
       <select onchange="setDay(${d},this.value)">${opts}</select></div>`;
   }).join('');
   document.getElementById('goalChips').innerHTML = Object.keys(GOALS).map(g=>
     `<button class="chip ${S.goal===g?'on':''}" onclick="setGoal('${g}')">${GOALS[g].label}</button>`).join('');
+  document.getElementById('langEs').classList.toggle('on', S.lang!=='en');
+  document.getElementById('langEn').classList.toggle('on', S.lang==='en');
   // equipo
   document.getElementById('eqCardio').innerHTML = CARDIO_EQ.map(e=>
     `<button class="chip eq ${has(e)?'on':''}" onclick="toggleEq('${e}')">${EQUIP[e]}</button>`).join('');
@@ -1223,7 +1235,7 @@ function renderFavs(){
   al.innerHTML = S.avoid.length? S.avoid.map(n=>listItem(n,'avoid')).join('')
     : '<div class="empty">Lista vacía. Toca 🚫 en un ejercicio para evitarlo.</div>';
   const sel=document.getElementById('pickEx');
-  sel.innerHTML = allExerciseNames().map(n=>`<option>${n}</option>`).join('');
+  sel.innerHTML = allExerciseNames().map(n=>`<option value="${n}">${n}</option>`).join('');
 }
 function unFav(n){ toggleFav(n); renderFavs(); toast('Quitado de favoritos'); }
 function unAvoid(n){ toggleAvoid(n); renderFavs(); toast('Quitado de evitar'); }
@@ -1256,7 +1268,7 @@ function renderProgress(){
   const sel=document.getElementById('wExSel');
   if(names.length){
     const prev=sel.value;
-    sel.innerHTML=names.map(n=>`<option ${n===prev?'selected':''}>${n}</option>`).join('');
+    sel.innerHTML=names.map(n=>`<option value="${n}" ${n===prev?'selected':''}>${n}</option>`).join('');
     renderWeightChart();
   } else {
     sel.innerHTML='<option>— Sin datos aún —</option>';
@@ -1332,8 +1344,223 @@ function resetAll(){
   }
 }
 
+// ---------- Idioma / Language ----------
+function setLang(l){ S.lang=l; save(); location.reload(); }
+// Reglas ES→EN (frases largas primero). Los datos internos siguen en español;
+// solo se traduce lo que se muestra en pantalla.
+const EN_RULES = [
+  // — frases de interfaz —
+  ['El coach los prioriza al armar tus rutinas. Márcalos con ☆ en cualquier ejercicio.','The coach prioritizes these when building your routines. Mark them with ☆ on any exercise.'],
+  ['Estos nunca aparecen en tus planes (lesión, no te gustan, etc.).',"These never appear in your plans (injury, dislike, etc.)."],
+  ['Marca lo que SÍ hay en tu gym. El coach solo sugerirá ejercicios que puedas hacer.','Mark what your gym DOES have. The coach will only suggest exercises you can do.'],
+  ['Asigna qué rutina toca cada día. Objetivo:','Assign a routine to each day. Goal:'],
+  ['El coach analiza balance, cardio, volumen y tu objetivo.','The coach analyzes balance, cardio, volume and your goal.'],
+  ['Elige un ejercicio para ver cuánto has levantado en cada sesión.','Pick an exercise to see how much you lifted each session.'],
+  ['Elige cualquier ejercicio de la biblioteca:','Pick any exercise from the library:'],
+  ['Toca una variante para reemplazarlo. Solo te muestro lo que puedes hacer con tu equipo.','Tap a variant to replace it. Only showing what you can do with your equipment.'],
+  ['Tus datos viven en este navegador. Exporta un respaldo de vez en cuando para no perderlos.','Your data lives in this browser. Export a backup now and then so you don\'t lose it.'],
+  ['Izq = posición inicial · Der = posición final. Necesita internet para cargar las fotos.','Left = start position · Right = end position. Internet needed to load photos.'],
+  ['El músculo crece en el descanso.','Muscle grows while you rest.'],
+  ['¿Con ganas? Ve al ','Feeling it? Go to '],
+  [' para una rutina rápida.',' for a quick routine.'],
+  ['¡Entreno completado! Buen trabajo, Roberto.','Workout complete! Great job, Roberto.'],
+  ['¡Entreno completo!','Workout complete!'],
+  ['Descansa antes de la próxima serie','Rest before your next set'],
+  ['Descanso entre series','Rest between sets'],
+  ['Saltar descanso','Skip rest'],
+  ['Aún no hay entrenos. ¡Empieza hoy! 💪','No workouts yet. Start today! 💪'],
+  ['Aún no tienes favoritos. Marca ☆ en un ejercicio.','No favorites yet. Mark ☆ on an exercise.'],
+  ['Lista vacía. Toca 🚫 en un ejercicio para evitarlo.','Empty list. Tap 🚫 on an exercise to avoid it.'],
+  ['Anota las libras en tus series y termina el entreno.','Log the pounds on your sets and finish the workout.'],
+  ['Aquí verás tu progreso. 📈','Your progress will show here. 📈'],
+  ['No hay más variantes disponibles con tu equipo.','No more variants available with your equipment.'],
+  ['Hoy toca ','Today is '],
+  ['Hoy tu plan marca ','Your plan says '],
+  [' — arranca con tu cardio de calentamiento. ¡Dale! 🔥',' — start with your cardio warm-up. Let\'s go! 🔥'],
+  ['Esta semana llevas ','This week you\'ve done '],
+  ['Priorizo tus ','I prioritize your '],
+  [' y evito ',' and avoid '],
+  [' al armar rutinas.',' when building routines.'],
+  ['¡Excelente constancia! 💪','Excellent consistency! 💪'],
+  ['Buen ritmo, sigue así.','Good pace, keep it up.'],
+  ['Vamos a sumar más 💪','Let\'s add more 💪'],
+  ['fuera de tus planes','out of your plans'],
+  ['desde la primera sesión','since the first session'],
+  ['ajusta y vuelve a subir','adjust and climb back up'],
+  ['mismo peso — intenta subir un poco','same weight — try going a bit heavier'],
+  // — evaluación del coach —
+  ['Hola Roberto','Hi Roberto'],
+  ['¡Rutina sólida! 💪','Solid routine! 💪'],['Buena, con ajustes 👍','Good, with tweaks 👍'],
+  ['A mejorar 🛠️','Needs work 🛠️'],
+  ['Arranca con cardio (como te gusta). Perfecto para calentar.','Starts with cardio (just how you like it). Perfect warm-up.'],
+  ['No empieza con cardio. Agrega 5-8 min de bici/corredora/remo al inicio.','Doesn\'t start with cardio. Add 5-8 min of bike/treadmill/rower first.'],
+  ['Tiene cardio (','Has cardio ('],
+  ['). Ideal para tu meta de bajar grasa.','). Ideal for your fat-loss goal.'],
+  ['Sin cardio. Para definir, suma 15-20 min al final.','No cardio. For cutting, add 15-20 min at the end.'],
+  ['Volumen adecuado (','Good volume ('],['Volumen bajo (','Low volume ('],
+  ['Volumen alto (','High volume ('],
+  ['). Suma 1-2 ejercicios.','). Add 1-2 exercises.'],
+  ['). Quizá te tome >75 min.','). It might take >75 min.'],
+  ['Buena variedad (','Good variety ('],['Pocos ejercicios (','Few exercises ('],
+  ['). Apunta a 4-6.','). Aim for 4-6.'],
+  ['Usa el equipo que tienes','Uses the equipment you have'],
+  [' opciones disponibles en tu gym).',' options available at your gym).'],
+  ['Tip: tienes mancuernas, poleas, prensa y kettlebells — aprovéchalos.','Tip: you have dumbbells, cables, leg press and kettlebells — use them.'],
+  ['Bien estructurada para tu objetivo de definir. Mantén descansos cortos (45-60s) y sube peso cuando completes todas las reps.','Well structured for your cutting goal. Keep rests short (45-60s) and add weight once you complete all reps.'],
+  ['Vas bien. Ajusta los puntos en ⚠️ y vas a sacarle más provecho al gym.','You\'re on track. Fix the ⚠️ items to get more out of your gym.'],
+  ['Empieza por agregar el cardio de calentamiento y 1-2 ejercicios más. Usa el botón "Generar rutina" abajo para una base optimizada.','Start by adding the cardio warm-up and 1-2 more exercises. Use the "Generate routine" button below for an optimized base.'],
+  ['Hoy es descanso 😴. Nada que evaluar — recupérate.','Today is a rest day 😴. Nothing to evaluate — recover.'],
+  ['Si quieres moverte, un cardio ligero o core.','If you feel like moving, light cardio or core work.'],
+  ['Coach:','Coach:'],
+  // — títulos de tarjetas / secciones —
+  ['Tu plan semanal','Your weekly plan'],['Mi equipo del gym','My gym equipment'],
+  ['Fuerza y máquinas','Strength & machines'],['Idioma / Language','Language / Idioma'],
+  ['Evaluar mi rutina de hoy',"Evaluate today's routine"],['Analizar ahora','Analyze now'],
+  ['Generar rutina para hoy','Generate a routine for today'],['Generar rutina 🔥','Generate routine 🔥'],
+  ['Vista previa','Preview'],['Usar esta rutina hoy ✅','Use this routine today ✅'],
+  ['Mis ejercicios favoritos','My favorite exercises'],['Ejercicios a evitar','Exercises to avoid'],
+  ['Agregar a una lista','Add to a list'],['A favoritos','To favorites'],['A evitar','To avoid'],
+  ['Tu progreso','Your progress'],['Progreso de peso por ejercicio','Weight progress per exercise'],
+  ['Historial reciente','Recent history'],['Días seguidos','Day streak'],
+  ['Entrenos totales','Total workouts'],['Esta semana','This week'],['Series completadas','Sets completed'],
+  ['Exportar respaldo','Export backup'],['Importar respaldo','Import backup'],['Borrar todo','Delete all'],
+  ['Agregar ejercicio igual','Add exercise anyway'],['Agregar ejercicio','Add exercise'],
+  ['Empezar entreno','Start workout'],['Terminar entreno','Finish workout'],
+  ['Registrar entreno','Log workout'],['Fin de la lista','End of list'],
+  ['Ver cómo se hace',"See how it's done"],['Ver cómo','How-to'],['Cambiar','Swap'],
+  ['¿Qué quieres entrenar?','What do you want to train?'],['Duración','Duration'],
+  ['Lo que toca hoy',"Today's plan"],['Peso corporal','Bodyweight'],
+  ['Reps / tiempo','Reps / time'],['Nombre','Name'],['Tipo','Type'],['Cancelar','Cancel'],
+  ['Agregar','Add'],['Cerrar','Close'],['Salir','Exit'],['Anterior','Previous'],['Siguiente','Next'],
+  ['Iniciar','Start'],['Reanudar','Resume'],['Pausar','Pause'],['Calentamiento:','Warm-up:'],
+  ['Calentamiento','Warm-up'],['Inicio','Start'],['Final','End'],['Datos','Data'],
+  ['Última vez','Last time'],['ejercicios hechos','exercises done'],
+  ['Ejercicio completado','Exercise complete'],['Hecho','Done'],['hecha','done'],
+  ['completado','complete'],['ejercicios','exercises'],['ejercicio','exercise'],
+  ['entrenos','workouts'],['entreno','workout'],
+  // — objetivos —
+  ['Bajar grasa / definir','Fat loss / cut'],['Ganar músculo','Build muscle'],
+  ['Mantenerme en forma','Stay fit'],['Objetivo','Goal'],
+  ['Más volumen, descansos cortos (45-60s) y cardio.','Higher volume, short rests (45-60s) and cardio.'],
+  ['Peso alto, 8-12 reps, descansos 60-90s.','Heavy weight, 8-12 reps, 60-90s rests.'],
+  ['Peso pesado, 4-6 reps, descansos largos 2-3 min.','Very heavy, 4-6 reps, long 2-3 min rests.'],
+  ['Equilibrio fuerza/cardio, constancia.','Strength/cardio balance, consistency.'],
+  // — rutinas —
+  ['Pecho/Tríceps','Chest/Triceps'],['Espalda/Bíceps','Back/Biceps'],['Piernas','Legs'],
+  ['Hombros','Shoulders'],['Full body fuerza','Full-body strength'],
+  ['Cardio quema-grasa','Fat-burn cardio'],['Peso corporal (casa)','Bodyweight (home)'],
+  ['Core/Abdomen','Core/Abs'],['Rutina del Coach','Coach routine'],['Descanso','Rest'],
+  ['(variante)','(variant)'],
+  // — equipo —
+  ['Bicicleta estática','Stationary bike'],['Corredora (caminata/trote)','Treadmill (walk/jog)'],
+  ['Corredora','Treadmill'],['Máquina de remo','Rowing machine'],['Elíptica','Elliptical'],
+  ['Mancuernas','Dumbbells'],['Barra + discos','Barbell + plates'],['Poleas/cables','Cables/pulleys'],
+  ['Banco ajustable','Adjustable bench'],['Prensa de piernas','Leg press'],
+  ['Máquinas guiadas','Guided machines'],['Kettlebells','Kettlebells'],['Bandas','Bands'],
+  // — ejercicios (nombres EN reales de gym) —
+  ['Press banca agarre neutro','Neutral-Grip DB Bench Press'],
+  ['Press banca con mancuernas','Dumbbell Bench Press'],
+  ['Press inclinado con mancuernas','Incline Dumbbell Press'],
+  ['Aperturas con mancuernas','Dumbbell Flyes'],['Aperturas inclinadas','Incline Flyes'],
+  ['Cruce en polea a un brazo','Single-Arm Cable Crossover'],
+  ['Cruce en polea baja','Low Cable Crossover'],['Cruce en poleas','Cable Crossover'],
+  ['Fondos en banco','Bench Dips'],
+  ['Extensión tríceps con cuerda','Rope Triceps Pushdown'],
+  ['Extensión tríceps agarre invertido','Reverse-Grip Pushdown'],
+  ['Extensión de tríceps en polea','Triceps Pushdown'],
+  ['Patada de tríceps con mancuerna','Dumbbell Kickback'],
+  ['Remo con mancuerna a una mano','One-Arm Dumbbell Row'],
+  ['Remo con mancuerna','One-Arm Dumbbell Row'],
+  ['Jalón a un brazo en polea','One-Arm Lat Pulldown'],
+  ['Jalón al pecho en polea','Lat Pulldown'],
+  ['Jalón con brazos rectos','Straight-Arm Pulldown'],
+  ['Remo en polea a un brazo','One-Arm Cable Row'],
+  ['Remo en polea baja','Seated Cable Row'],
+  ['Pullover con mancuerna','Dumbbell Pullover'],
+  ['Curl de bíceps con mancuernas','Dumbbell Bicep Curl'],
+  ['Curl alternado con mancuernas','Alternating Dumbbell Curl'],
+  ['Curl martillo inclinado','Incline Hammer Curl'],['Curl martillo','Hammer Curl'],
+  ['Curl en polea','Cable Curl'],['Curl + extensión','Curl + Extension'],
+  ['Sentadilla con mancuernas','Dumbbell Squat'],
+  ['Sentadilla búlgara con mancuernas','Bulgarian Split Squat'],
+  ['Sentadilla plié con mancuerna','Plié Dumbbell Squat'],
+  ['Sentadilla goblet','Goblet Squat'],['Sentadillas','Squats'],
+  ['Prensa postura cerrada','Narrow-Stance Leg Press'],
+  ['Peso muerto rumano con mancuernas','Dumbbell Romanian Deadlift'],
+  ['Zancada hacia atrás con mancuernas','Dumbbell Rear Lunge'],
+  ['Zancadas con mancuernas','Dumbbell Lunges'],['Zancadas','Lunges'],
+  ['Swing con kettlebell','Kettlebell Swing'],
+  ['Elevación de pantorrilla','Calf Raise'],
+  ['Press de hombro con mancuernas','Dumbbell Shoulder Press'],
+  ['Press de hombro a un brazo','One-Arm Shoulder Press'],
+  ['Press de hombro','Shoulder Press'],
+  ['Elevación lateral en polea sentado','Seated Cable Lateral Raise'],
+  ['Elevaciones laterales','Lateral Raises'],
+  ['Pájaros (deltoide posterior)','Rear Delt Raises'],['Pájaros en polea','Cable Rear Delt Fly'],
+  ['Elevación frontal con dos mancuernas','Front Two-Dumbbell Raise'],
+  ['Elevación frontal','Front Raise'],
+  ['Face pull en polea','Cable Face Pull'],
+  ['Encogimientos con mancuernas','Dumbbell Shrugs'],
+  ['Flexiones cerradas y abiertas','Close & Wide Pushups'],['Flexiones','Pushups'],
+  ['Plancha lateral','Side Plank'],['Plancha','Plank'],
+  ['Abdominales bicicleta','Bicycle Crunches'],
+  ['Remo con banda','Band Pull-Apart'],
+  ['Crunch cruzado','Cross-Body Crunch'],
+  ['Elevación lateral de piernas','Side Leg Raises'],
+  ['Elevación de piernas','Leg Raises'],
+  ['Cardio estado estable','Steady-state cardio'],
+  ['Cardio por intervalos','Interval cardio'],
+  ['min ritmo medio','min moderate pace'],['min suave','min easy pace'],
+  ['10 series 30s fuerte / 30s suave','10 rounds 30s hard / 30s easy'],
+  // — palabras sueltas (al final, con cuidado) —
+  ['series totales','total sets'],['series','sets'],['Serie','Set'],['serie','set'],
+  ['Pesas','Weights'],['Evitar','Avoid'],['Favorito','Favorite'],['favoritos','favorites'],
+  ['favorito','favorite'],['Mías','Mine'],['Semana','Week'],['Hoy','Today'],['Progreso','Progress'],
+  [/\bLun\b/g,'Mon'],[/\bMar\b/g,'Tue'],[/\bMié\b/g,'Wed'],[/\bJue\b/g,'Thu'],
+  [/\bVie\b/g,'Fri'],[/\bSáb\b/g,'Sat'],[/\bDom\b/g,'Sun'],
+  [/\bVer\b/g,'View'],[/ c\/u\b/g,' each'],['máx','max'],[/\bRemo\b/g,'Rower'],
+];
+function translateText(t){
+  let out=t;
+  for(const [a,b] of EN_RULES){
+    if(typeof a==='string'){ if(out.includes(a)) out=out.split(a).join(b); }
+    else out=out.replace(a,b);
+  }
+  return out;
+}
+function translateTree(root){
+  const w=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  let n; const todo=[];
+  while(n=w.nextNode()) todo.push(n);
+  todo.forEach(node=>{
+    const t=node.nodeValue; if(!t||!t.trim()) return;
+    const nt=translateText(t);
+    if(nt!==t) node.nodeValue=nt;
+  });
+}
+let i18nObs=null;
+function initEnglish(){
+  document.documentElement.lang='en';
+  translateTree(document.body);
+  i18nObs=new MutationObserver(muts=>{
+    i18nObs.disconnect();
+    muts.forEach(m=>{
+      if(m.type==='characterData') { const nt=translateText(m.target.nodeValue||'');
+        if(nt!==m.target.nodeValue) m.target.nodeValue=nt; }
+      m.addedNodes && m.addedNodes.forEach(nd=>{
+        if(nd.nodeType===3){ const nt=translateText(nd.nodeValue||'');
+          if(nt!==nd.nodeValue) nd.nodeValue=nt; }
+        else if(nd.nodeType===1) translateTree(nd);
+      });
+    });
+    i18nObs.observe(document.body,{subtree:true,childList:true,characterData:true});
+  });
+  i18nObs.observe(document.body,{subtree:true,childList:true,characterData:true});
+}
+
 // ---------- Init ----------
 renderToday(); upTimer(); backupReminder();
+if(S.lang==='en') initEnglish();
 </script>
 </body>
 </html>
