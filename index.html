@@ -298,6 +298,16 @@
   </div>
 </div>
 
+<!-- Modal cambiar por variante -->
+<div class="modal" id="swapModal" onclick="if(event.target===this)closeSwap()">
+  <div class="sheet">
+    <button class="xclose" onclick="closeSwap()">✕</button>
+    <h2 id="swapTitle" style="font-size:16px;margin-bottom:4px;padding-right:38px"></h2>
+    <div class="note" style="margin-top:0">Toca una variante para reemplazarlo. Solo te muestro lo que puedes hacer con tu equipo.</div>
+    <div id="swapList" style="margin-top:12px"></div>
+  </div>
+</div>
+
 <!-- Modo Entrenando -->
 <div class="wo" id="woView">
   <div class="wo-head">
@@ -414,6 +424,46 @@ const LIB = {
   },
 };
 
+// Variantes extra (solo para el botón 🔄 Cambiar — no aparecen en rutinas por defecto)
+const EXTRA = {
+  'Pecho/Tríceps': [
+    {n:'Press banca agarre neutro',s:4,r:'10-12',eq:['mancuernas','banco']},
+    {n:'Aperturas inclinadas',s:3,r:'12-15',eq:['mancuernas','banco']},
+    {n:'Cruce en polea baja',s:3,r:'12-15',eq:['poleas']},
+    {n:'Cruce en polea a un brazo',s:3,r:'12 c/u',eq:['poleas']},
+    {n:'Extensión tríceps con cuerda',s:3,r:'12-15',eq:['poleas']},
+    {n:'Extensión tríceps agarre invertido',s:3,r:'12',eq:['poleas']},
+    {n:'Flexiones',s:4,r:'12-15',eq:['corporal']},
+  ],
+  'Espalda/Bíceps': [
+    {n:'Jalón a un brazo en polea',s:3,r:'12 c/u',eq:['poleas']},
+    {n:'Remo en polea a un brazo',s:3,r:'12 c/u',eq:['poleas']},
+    {n:'Jalón con brazos rectos',s:3,r:'12-15',eq:['poleas']},
+    {n:'Curl alternado con mancuernas',s:3,r:'12 c/u',eq:['mancuernas']},
+    {n:'Curl martillo inclinado',s:3,r:'12',eq:['mancuernas','banco']},
+  ],
+  'Piernas': [
+    {n:'Sentadilla plié con mancuerna',s:3,r:'12-15',eq:['mancuernas']},
+    {n:'Sentadilla búlgara con mancuernas',s:3,r:'10 c/u',eq:['mancuernas','banco']},
+    {n:'Prensa postura cerrada',s:4,r:'12',eq:['prensa']},
+    {n:'Zancada hacia atrás con mancuernas',s:3,r:'12 c/u',eq:['mancuernas']},
+  ],
+  'Hombros': [
+    {n:'Press de hombro a un brazo',s:3,r:'10 c/u',eq:['mancuernas']},
+    {n:'Elevación lateral en polea sentado',s:3,r:'12-15',eq:['poleas']},
+    {n:'Elevación frontal con dos mancuernas',s:3,r:'12',eq:['mancuernas']},
+    {n:'Pájaros en polea',s:3,r:'15',eq:['poleas']},
+  ],
+  'Core/Abdomen': [
+    {n:'Crunch cruzado',s:3,r:'15 c/u',eq:['corporal']},
+    {n:'Elevación lateral de piernas',s:3,r:'15 c/u',eq:['corporal']},
+  ],
+  'Peso corporal (casa)': [
+    {n:'Flexiones cerradas y abiertas',s:3,r:'10+10',eq:['corporal']},
+    {n:'Crunch cruzado',s:3,r:'15 c/u',eq:['corporal']},
+  ],
+};
+
 // Imágenes-ejemplo: nombre de ejercicio -> id en free-exercise-db (2 fotos: inicio/fin)
 const IMG_BASE = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/';
 const IMG = {
@@ -459,6 +509,28 @@ const IMG = {
   'Plancha lateral':'Side_Bridge',
   'Russian twist':'Russian_Twist',
   'Mountain climbers':'Mountain_Climbers',
+  'Press banca agarre neutro':'Dumbbell_Bench_Press_with_Neutral_Grip',
+  'Aperturas inclinadas':'Incline_Dumbbell_Flyes',
+  'Cruce en polea baja':'Low_Cable_Crossover',
+  'Cruce en polea a un brazo':'Single-Arm_Cable_Crossover',
+  'Extensión tríceps con cuerda':'Triceps_Pushdown_-_Rope_Attachment',
+  'Extensión tríceps agarre invertido':'Reverse_Grip_Triceps_Pushdown',
+  'Jalón a un brazo en polea':'One_Arm_Lat_Pulldown',
+  'Remo en polea a un brazo':'Seated_One-arm_Cable_Pulley_Rows',
+  'Jalón con brazos rectos':'Straight-Arm_Pulldown',
+  'Curl alternado con mancuernas':'Dumbbell_Alternate_Bicep_Curl',
+  'Curl martillo inclinado':'Incline_Hammer_Curls',
+  'Sentadilla plié con mancuerna':'Plie_Dumbbell_Squat',
+  'Sentadilla búlgara con mancuernas':'Split_Squat_with_Dumbbells',
+  'Prensa postura cerrada':'Narrow_Stance_Leg_Press',
+  'Zancada hacia atrás con mancuernas':'Dumbbell_Rear_Lunge',
+  'Press de hombro a un brazo':'Dumbbell_One-Arm_Shoulder_Press',
+  'Elevación lateral en polea sentado':'Cable_Seated_Lateral_Raise',
+  'Elevación frontal con dos mancuernas':'Front_Two-Dumbbell_Raise',
+  'Pájaros en polea':'Cable_Rear_Delt_Fly',
+  'Crunch cruzado':'Cross-Body_Crunch',
+  'Elevación lateral de piernas':'Side_Leg_Raises',
+  'Flexiones cerradas y abiertas':'Pushups_Close_and_Wide_Hand_Positions',
 };
 function imgId(name){ return IMG[name] || null; }
 function imgUrls(name){ const id=imgId(name); return id? [IMG_BASE+id+'/0.jpg', IMG_BASE+id+'/1.jpg']:null; }
@@ -649,8 +721,9 @@ function renderToday(){
       html += `<div class="row" style="margin-top:8px">`;
       if(e.cat!=='cardio' && imgId(e.n))
         html += `<button class="btn ghost sm" onclick="openDemo('${nm}','${(e.base>1?e.base+' series · ':'')+e.r}')">📷 Ver</button>`;
-      html += `<button class="btn ghost sm" style="${isFav(e.n)?'color:var(--warn)':''}" onclick="favHere('${nm}')">${isFav(e.n)?'⭐ Favorito':'☆ Favorito'}</button>`;
-      html += `<button class="btn ghost sm" style="color:var(--red)" onclick="avoidHere('${nm}')">🚫 Evitar</button>`;
+      html += `<button class="btn ghost sm" style="${isFav(e.n)?'color:var(--warn)':''}" onclick="favHere('${nm}')">${isFav(e.n)?'⭐':'☆'}</button>`;
+      html += `<button class="btn ghost sm" onclick="openSwap(${i})">🔄 Cambiar</button>`;
+      html += `<button class="btn ghost sm" style="color:var(--red)" onclick="avoidHere('${nm}')">🚫</button>`;
       html += `</div>`;
     }
     if(e.cat==='pesas' && !e.warmup){
@@ -712,6 +785,68 @@ function lastWeights(n){
   return list[list.length-1];
 }
 
+// ---------- Cambiar por variante ----------
+let swapIdx=-1, swapFromWO=false;
+function findRoutineOf(name){
+  for(const cat in LIB){ for(const rn in LIB[cat]){
+    if(LIB[cat][rn].some(e=>resolveCardioName(e)===name||e.n===name)) return {cat,rn}; } }
+  for(const rn in EXTRA){
+    if(EXTRA[rn].some(e=>e.n===name)){
+      for(const cat in LIB){ if(LIB[cat][rn]) return {cat,rn}; }
+      return {cat:'pesas',rn};
+    }
+  }
+  return null;
+}
+function swapOptions(name){
+  const cur=getTodayLog().exercises.map(e=>e.n);
+  const home=findRoutineOf(name);
+  const opts=[]; const seen=new Set(cur);
+  const pushFrom=(cat,rn,label)=>{
+    LIB[cat][rn].forEach(e=>{
+      const n=resolveCardioName(e);
+      if(seen.has(n)||!canDo(e)||isAvoid(n)) return;
+      seen.add(n); opts.push({n, s:e.s, r:e.r, cat, label});
+    });
+  };
+  const pushExtra=(rn,cat)=>{
+    (EXTRA[rn]||[]).forEach(e=>{
+      if(seen.has(e.n)||!canDo(e)||isAvoid(e.n)) return;
+      seen.add(e.n); opts.push({n:e.n, s:e.s, r:e.r, cat, label:rn+' (variante)'});
+    });
+  };
+  if(home){ pushFrom(home.cat, home.rn, home.rn); pushExtra(home.rn, home.cat); } // mismo grupo primero
+  if(home){ for(const rn in LIB[home.cat]){ if(rn!==home.rn) pushFrom(home.cat,rn,rn); } }
+  else { for(const cat in LIB){ for(const rn in LIB[cat]) pushFrom(cat,rn,rn); } }
+  return opts;
+}
+function openSwap(i){
+  swapIdx=i; swapFromWO=document.getElementById('woView').classList.contains('show');
+  const e=getTodayLog().exercises[i];
+  const opts=swapOptions(e.n);
+  document.getElementById('swapTitle').textContent='🔄 Cambiar "'+e.n+'"';
+  document.getElementById('swapList').innerHTML = opts.length? opts.map(o=>{
+    const nm=o.n.replace(/'/g,"\\'");
+    return `<div class="day" style="cursor:pointer" onclick="doSwap('${nm}')">
+      <div style="flex:1"><div style="font-weight:700;font-size:14px">${o.n}</div>
+        <div class="ex-meta">${o.label} · ${o.s>1?o.s+' series · ':''}${o.r}</div></div>
+      ${imgId(o.n)?`<button class="del" style="color:var(--accent2)" onclick="event.stopPropagation();openDemo('${nm}','')">📷</button>`:''}
+      <span style="color:var(--accent);font-weight:800">→</span></div>`;
+  }).join('') : '<div class="empty">No hay más variantes disponibles con tu equipo.</div>';
+  document.getElementById('swapModal').classList.add('show');
+}
+function closeSwap(){ document.getElementById('swapModal').classList.remove('show'); }
+function doSwap(name){
+  const opts=swapOptions(getTodayLog().exercises[swapIdx].n);
+  const o=opts.find(x=>x.n===name); if(!o) return;
+  const l=getTodayLog();
+  l.exercises[swapIdx]={n:o.n, base:o.s, r:o.r, cat:o.cat, done:false,
+    sets:Array.from({length:o.s},()=>({w:'',r:''}))};
+  save(); closeSwap();
+  toast('🔄 Cambiado a '+o.n);
+  if(swapFromWO) renderWO(); else renderToday();
+}
+
 // ---------- Modo Entrenando ----------
 let woIdx=0, woRest=0, woRestInt=null;
 function woRestSecs(){ return S.goal==='fuerza'?120 : S.goal==='musculo'?90 : 60; }
@@ -750,9 +885,14 @@ function renderWO(){
     <div class="wo-name" style="color:${e.done?'var(--muted)':'var(--txt)'}">${e.n}</div>
     <div class="wo-meta"><span class="tag ${catTag(e.cat)}">${e.warmup?'Calentamiento':catName(e.cat)}</span>
       &nbsp;${e.base>1?e.base+' series · ':''}${e.r}</div>`;
-  if(!e.warmup && e.cat!=='cardio' && imgId(e.n))
-    html+=`<div style="text-align:center;margin-top:10px">
-      <button class="btn ghost sm" onclick="openDemo('${nm}','${(e.base>1?e.base+' series · ':'')+e.r}')">📷 Ver cómo se hace</button></div>`;
+  if(!e.warmup){
+    html+=`<div style="text-align:center;margin-top:10px;display:flex;gap:8px;justify-content:center">`;
+    if(e.cat!=='cardio' && imgId(e.n))
+      html+=`<button class="btn ghost sm" onclick="openDemo('${nm}','${(e.base>1?e.base+' series · ':'')+e.r}')">📷 Ver cómo</button>`;
+    if(!e.done)
+      html+=`<button class="btn ghost sm" onclick="openSwap(${woIdx})">🔄 Cambiar</button>`;
+    html+=`</div>`;
+  }
   if(isPesas){
     if(lw) html+=`<div class="wo-meta" style="color:var(--accent2);margin-top:10px">📌 Última vez: ${lw.sets.join(' · ')} lb</div>`;
     html+=`<div class="wo-sets">`+e.sets.map((s,j)=>
