@@ -2,11 +2,13 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0f1419">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Mi Coach Fitness</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root{
     --bg:#0f1419; --card:#1a212b; --card2:#222c38; --line:#2c3744;
@@ -570,17 +572,21 @@ const RCOLOR = {
 function rcolor(rn){ return RCOLOR[rn]||'#34d399'; }
 
 // ---------- Estado ----------
+let loadIssue=false;
 let S = load();
 function load(){ try{ return migrate(JSON.parse(localStorage.getItem('fitcoach'))) || seed(); }
-  catch(e){ return seed(); } }
+  catch(e){ loadIssue=true; return seed(); } }
 function migrate(s){
   if(!s) return null;
+  if(!s.logs || !Array.isArray(s.history) || !s.week || !GOALS[s.goal]) throw new Error('Invalid saved state');
   if(!s.equipment) s.equipment = defaultEquip();
   if(!s.custom) s.custom = {};
   if(!s.favorites) s.favorites = [];
   if(!s.avoid) s.avoid = [];
   if(!s.weights) s.weights = {};
   if(!s.lang) s.lang = 'es';
+  if(!s.sessions) s.sessions=[];
+  if(!s.unit) s.unit='lb';
   return s;
 }
 function defaultEquip(){
@@ -602,7 +608,7 @@ function seed(){
   };
 }
 function save(){ localStorage.setItem('fitcoach', JSON.stringify(S)); }
-function todayKey(){ return new Date().toISOString().slice(0,10); }
+function todayKey(d=new Date()){ return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); }
 function has(eq){ return !!S.equipment[eq]; }
 function isFav(n){ return S.favorites.includes(n); }
 function isAvoid(n){ return S.avoid.includes(n); }
@@ -774,7 +780,7 @@ function finishWorkout(){
   const l=getTodayLog(); l.finished=true;
   const sets=l.exercises.reduce((a,e)=>a+(e.done?e.base:0),0);
   S.history.unshift({date:todayKey(), routine:l.routine, sets});
-  S.history=S.history.slice(0,40);
+
   // guardar pesos por ejercicio para ver progreso
   l.exercises.forEach(e=>{
     if(e.warmup || e.cat!=='pesas') return;
@@ -784,7 +790,7 @@ function finishWorkout(){
     const list=S.weights[e.n];
     const last=list[list.length-1];
     if(last && last.d===todayKey()) last.sets=w; else list.push({d:todayKey(), sets:w});
-    if(list.length>30) list.shift();
+
   });
   save(); renderToday(); toast('🎉 ¡Entreno registrado!');
 }
@@ -992,7 +998,8 @@ function renderAxCat(){
 function confirmAdd(){
   const name=document.getElementById('axName').value.trim();
   if(!name){ toast('Escribe un nombre'); return; }
-  const s=Math.max(1,parseInt(document.getElementById('axSets').value)||1);
+  if(/[<>\"'`\\]/.test(name+document.getElementById('axReps').value)){toast('Usa letras, números y guiones');return;}
+  const s=Math.min(12,Math.max(1,parseInt(document.getElementById('axSets').value)||1));
   const r=document.getElementById('axReps').value.trim()||'12';
   const ex={n:name,base:s,r:r,cat:axCat,custom:true,done:false,
     sets:Array.from({length:s},()=>({w:'',r:''}))};
@@ -1068,7 +1075,7 @@ function renderWeek(){
     `<button class="chip eq ${has(e)?'on':''}" onclick="toggleEq('${e}')">${EQUIP[e]}</button>`).join('');
 }
 function setDay(d,v){ S.week[d]=v;
-  if(d===new Date().getDay()) delete S.logs[todayKey()];
+  // Existing sessions are preserved when the weekly plan changes.
   save(); toast('Plan actualizado'); }
 function setGoal(g){ S.goal=g; save(); renderWeek(); toast('Objetivo: '+GOALS[g].label); }
 function toggleEq(e){ S.equipment[e]=has(e)?0:1; save(); renderWeek(); }
@@ -1079,7 +1086,7 @@ function renderCoach(){
   const g=GOALS[S.goal];
   const today=S.week[new Date().getDay()]||'Descanso';
   const now=new Date();
-  const doneWeek = S.history.filter(h=>(now-new Date(h.date))/864e5<7).length;
+  const doneWeek = S.history.filter(h=>h.date>=todayKey(weekStart(now)) && h.date<=todayKey()).length;
   let msg=`<b>Hola Roberto 👋</b><br>Objetivo: <b>${g.label}</b>. ${g.tip}<br><br>`;
   if(today==='Descanso') msg+=`Hoy tu plan marca <b>descanso</b> 😴. Si quieres moverte, un cardio ligero o core.`;
   else msg+=`Hoy toca <b>${today}</b> — arranca con tu cardio de calentamiento. ¡Dale! 🔥`;
@@ -1251,15 +1258,15 @@ function addPick(kind){
 function renderProgress(){
   const h=S.history; const now=new Date();
   document.getElementById('stTotal').textContent=h.length;
-  document.getElementById('stWeek').textContent=h.filter(x=>(now-new Date(x.date))/864e5<7).length;
+  document.getElementById('stWeek').textContent=h.filter(x=>(now-new Date(x.date+'T12:00:00'))/864e5<7).length;
   document.getElementById('stVol').textContent=h.reduce((a,x)=>a+(x.sets||0),0);
   let streak=0; let cur=new Date(); cur.setHours(0,0,0,0);
   const dates=new Set(h.map(x=>x.date));
   if(!dates.has(todayKey())) cur.setDate(cur.getDate()-1);
-  while(dates.has(cur.toISOString().slice(0,10))){ streak++; cur.setDate(cur.getDate()-1); }
+  while(dates.has(todayKey(cur))){ streak++; cur.setDate(cur.getDate()-1); }
   document.getElementById('stStreak').textContent=streak;
   document.getElementById('histList').innerHTML = h.length? h.slice(0,15).map(x=>{
-    const dt=new Date(x.date);
+    const dt=new Date(x.date+'T12:00:00');
     return `<div class="hist"><span>${DAYS[dt.getDay()]} ${dt.getDate()}/${dt.getMonth()+1} · <b>${x.routine}</b></span>
       <span style="color:var(--accent)">${x.sets} series</span></div>`;
   }).join('') : '<div class="empty">Aún no hay entrenos. ¡Empieza hoy! 💪</div>';
@@ -1558,6 +1565,9 @@ function initEnglish(){
   i18nObs.observe(document.body,{subtree:true,childList:true,characterData:true});
 }
 
+</script>
+<script src="improvements.js"></script>
+<script>
 // ---------- Init ----------
 renderToday(); upTimer(); backupReminder();
 if(S.lang==='en') initEnglish();
